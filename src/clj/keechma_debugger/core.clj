@@ -30,7 +30,8 @@
   ;; <other stuff>
   (GET "/debugger" req
        (h/html
-        [:head {:charset "utf-8"}]
+        [:head {:charset "utf-8"}
+         [:link {:href "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" :rel "stylesheet"}]]
         [:body
          [:div {:id "app"}]
          [:script {:src "js/compiled/app.js"}]
