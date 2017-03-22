@@ -4,6 +4,7 @@
                  [ring "1.6.0-RC1"]
                  [ring/ring-defaults "0.2.3"]
                  [compojure "1.5.2"]
+                 [garden "1.3.2"]
                  [com.taoensso/sente "1.11.0"]
                  [reagent "0.6.0"]
                  [hiccup "1.0.5"]
