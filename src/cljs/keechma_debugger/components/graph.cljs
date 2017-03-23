@@ -2,7 +2,17 @@
   (:require
    [keechma.ui-component :as ui]
    [keechma.toolbox.css.core :refer-macros [defelement]]
-   [keechma-debugger.util :refer [index-of]]))
+   [keechma-debugger.util :refer [index-of]]
+   [garden.color :as color]
+   [goog.string :as gstring]))
+
+(defn generate-color-from-term [t]
+  (let [term (name t)
+        term-length (count term)
+        modifier (* term-length term-length)
+        hash-code (gstring/hashCode term) 
+        term-hue (mod (+ modifier hash-code) 360)]
+    (color/as-hex (color/hsl term-hue 100 35))))
 
 (defn calculate-x [event controllers]
   (if (= :controller (:type event))
@@ -14,7 +24,7 @@
 (defn build-current-controller-line [current-line idx x e]
   (if (:y1 current-line)
     (assoc current-line :y2 idx)
-    {:key (:id e) :stroke-width 2 :stroke "black" :x1 x :x2 x :y1 idx}))
+    {:key (:id e) :stroke-width 2 :stroke (generate-color-from-term (:topic e)) :x1 x :x2 x :y1 idx}))
 
 (defn build-current-connector-line [line idx controllers e open?]
   (if open?
@@ -24,7 +34,8 @@
     (if (and (:x1 line) (:y1 line) (nil? (:x2 line)) (nil? (:y2 line)))
       (assoc line
              :x2 (calculate-x e controllers)
-             :y2 idx)
+             :y2 idx
+             :stroke (generate-color-from-term (:topic e)))
       nil)))
 
 (defn calculate-controllers-connectors [events controllers]
@@ -110,29 +121,31 @@
              :y1 (/ height-factor 2)
              :y2 (+ (/ height-factor 2) (* (count events) height-factor))
              :stroke "black"
-             :stroke-width 2}]     
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key]}]
-                   [:path
-                    {:d (make-connector-path {:x1 (/ width-factor 2)
-                                              :x2 (+ (/ width-factor 2) (* width-factor x2))
-                                              :y1 (+ (/ height-factor 2) (* height-factor y1))
-                                              :y2 (+ (/ height-factor 2) (* height-factor y2))})
-                     :key key
-                     :stroke "black"
-                     :stroke-width 2
-                     :fill "transparent"}])
-                 (remove nil? (flatten (vals connectors)))))
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key]}]
+             :stroke-width 2}] 
+     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke]}]
                    [:line {:key key
                            :x1 (+ (/ width-factor 2) (* width-factor x1))
                            :x2 (+ (/ width-factor 2) (* width-factor x2))
                            :y1 (+ (/ height-factor 2) (* height-factor y1))
                            :y2 (+ (/ height-factor 2) (* height-factor y2))
                            :stroke-width 2
-                           :stroke "black"}])
+                           :stroke stroke}])
                  (flatten (vals controller-connectors))))
+
+     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke]}]
+                   [:path
+                    {:d (make-connector-path {:x1 (/ width-factor 2)
+                                              :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                              :y1 (+ (/ height-factor 2) (* height-factor y1))
+                                              :y2 (+ (/ height-factor 2) (* height-factor y2))})
+                     :key key
+                     :stroke stroke
+                     :stroke-width 2
+                     :fill "transparent"}])
+                 (remove nil? (flatten (vals connectors)))))
      (doall (map-indexed (fn [idx e]
                            [:circle {:key (:id e)
+                                     :fill (if (= :controller (:type e)) (generate-color-from-term (:topic e)) "black")
                                      :r (/ width-factor 4)
                                      :cy (+ (/ height-factor 2) (* idx height-factor))
                                      :cx  (+ (/ width-factor 2) (* width-factor (calculate-x e controllers)))}])
