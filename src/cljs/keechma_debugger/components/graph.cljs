@@ -8,14 +8,24 @@
   (if (= :controller (:type event))
     (let [topic (:topic event)
           idx (index-of controllers topic)]
-      (+ 10 (* 20 idx)))
-    10))
+      idx)
+    0))
 
-
-(defn build-current-line [current-line idx x e]
+(defn build-current-controller-line [current-line idx x e]
   (if (:y1 current-line)
-    (assoc current-line :y2 (+ 13.5 (* idx 27)))
-    {:key (:id e) :stroke-width 2 :stroke "black" :x1 x :x2 x :y1 (+ 13.5 (* idx 27))}))
+    (assoc current-line :y2 idx)
+    {:key (:id e) :stroke-width 2 :stroke "black" :x1 x :x2 x :y1 idx}))
+
+(defn build-current-connector-line [line idx controllers e open?]
+  (if open?
+    {:x1 0
+     :y1 idx
+     :key (:id e)}
+    (if (and (:x1 line) (:y1 line) (nil? (:x2 line)) (nil? (:y2 line)))
+      (assoc line
+             :x2 (calculate-x e controllers)
+             :y2 idx)
+      nil)))
 
 (defn calculate-controllers-connectors [events controllers]
   (reduce (fn [acc [idx e]]
@@ -28,7 +38,7 @@
                       prev-lines (if start? lines (drop-last lines))
                       current-line (if start? {} (or (last lines) {}))
                       x (calculate-x e controllers)]
-                  (assoc acc topic (conj (vec prev-lines) (build-current-line current-line idx x e))))
+                  (assoc acc topic (conj (vec prev-lines) (build-current-controller-line current-line idx x e))))
                 acc)
               )) {} (map-indexed (fn [idx e] [idx e]) events)))
 
@@ -72,17 +82,6 @@
       :component ev-name
       :controller (flatten [topic ev-name]))))
 
-(defn build-current-connector-line [line idx controllers e open?]
-  (if open?
-    {:x1 10
-     :y1 (+ 13.5 (* idx 27))
-     :key (:id e) :stroke-width 2 :stroke "black"}
-    (if (and (:x1 line) (:y1 line) (nil? (:x2 line)) (nil? (:y2 line)))
-      (assoc line
-             :x2 (calculate-x e controllers)
-             :y2 (+ 13.5 (* idx 27)))
-      nil)))
-
 (defn calculate-main->controllers-connectors [events controllers]
   (reduce (fn [acc [idx e]]
             (let [type (:type e)]
@@ -101,22 +100,40 @@
   (let [events (:events app-events)
         controllers (:controllers app-events)
         height-factor 27
-        lines (calculate-controllers-connectors events controllers)
+        width-factor 20
+        controller-connectors (calculate-controllers-connectors events controllers)
         connectors (calculate-main->controllers-connectors events controllers)]
     [:svg {:height (str (* height-factor (count events)) "px")
-           :width (str (* 20 (count controllers)) "px")}
-     [:line {:x1 10
-             :x2 10
-             :y1 13.5
-             :y2 (+ 13.5 (* (count events) height-factor))
+           :width (str (* width-factor (count controllers)) "px")}
+     [:line {:x1 (/ width-factor 2)
+             :x2 (/ width-factor 2)
+             :y1 (/ height-factor 2)
+             :y2 (+ (/ height-factor 2) (* (count events) height-factor))
              :stroke "black"
              :stroke-width 2}]     
+     (doall (map (fn [{:keys [x1 x2 y1 y2 key]}]
+                   [:path
+                    {:d (make-connector-path {:x1 (/ width-factor 2)
+                                              :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                              :y1 (+ (/ height-factor 2) (* height-factor y1))
+                                              :y2 (+ (/ height-factor 2) (* height-factor y2))})
+                     :key key
+                     :stroke "black"
+                     :stroke-width 2
+                     :fill "transparent"}])
+                 (remove nil? (flatten (vals connectors)))))
+     (doall (map (fn [{:keys [x1 x2 y1 y2 key]}]
+                   [:line {:key key
+                           :x1 (+ (/ width-factor 2) (* width-factor x1))
+                           :x2 (+ (/ width-factor 2) (* width-factor x2))
+                           :y1 (+ (/ height-factor 2) (* height-factor y1))
+                           :y2 (+ (/ height-factor 2) (* height-factor y2))
+                           :stroke-width 2
+                           :stroke "black"}])
+                 (flatten (vals controller-connectors))))
      (doall (map-indexed (fn [idx e]
                            [:circle {:key (:id e)
-                                     :r 5
-                                     :cy (+ 13.5 (* idx height-factor))
-                                     :cx (calculate-x e controllers)}]) events))
-     (doall (map (fn [line]
-                   [:path {:d (make-connector-path line) :key (:key line) :stroke (:stroke line) :stroke-width (:stroke-width line) :fill "transparent"}]) (remove nil? (flatten (vals connectors)))))
-     (doall (map (fn [line]
-                   [:line line]) (flatten (vals lines))))]))
+                                     :r (/ width-factor 4)
+                                     :cy (+ (/ height-factor 2) (* idx height-factor))
+                                     :cx  (+ (/ width-factor 2) (* width-factor (calculate-x e controllers)))}])
+                         events))]))
