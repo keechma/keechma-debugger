@@ -9,6 +9,7 @@
 (def event-store-layout
   {:events {}
    :apps-order []
+   :controllers {}
    :apps-status {}})
 
 (defn get-app-events [events app-name]
@@ -24,13 +25,14 @@
    :severity severity})
 
 (defn process-start-event [store event]
-  (let [[app-name type direction _ name _ _] event]
+  (let [[app-name type direction _ name payload _] event]
     (if (and (= :app type)
              (= :in direction)
              (= :start name))
       (assoc store
              :apps-order (conj (:apps-order store) app-name)
-             :apps-status (assoc (:apps-status store) app-name :start))
+             :apps-status (assoc (:apps-status store) app-name :start)
+             :controllers (assoc (:controllers store) app-name payload))
       store)))
 
 (defn process-stop-event [store event]
