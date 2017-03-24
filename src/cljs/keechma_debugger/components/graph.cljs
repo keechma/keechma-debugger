@@ -35,6 +35,7 @@
       (assoc line
              :x2 (calculate-x e controllers)
              :y2 idx
+             :stroke-color-term (name (:topic e))
              :stroke (generate-color-from-term (:topic e)))
       nil)))
 
@@ -61,6 +62,10 @@
         delta-x (* delta-factor (- x2 x1))
         delta-y (* delta-factor (- y2 y1))
         delta (min delta-x delta-y)
+
+        x-diff (- x2 x1)
+        y-diff (- y2 y1)
+
         arc-1 0
         arc-2 1]
     (str "M" x1 " " y1
@@ -68,7 +73,8 @@
          " A" delta " " delta " 0 0 " arc-1 " " (+ x1 (* delta (signum delta-x))) " " (+ y1 (* 2 delta))
          " H" (- x2 (* delta (signum delta-x)))
          " A" delta " " delta " 0 0 " arc-2 " " x2 " " (+ y1 (* 3 delta))
-         " V" y2)))
+         " V"  y2)
+    ))
 
 
 (defn opening-main->controller-event? [e]
@@ -111,27 +117,37 @@
   (let [events (:events app-events)
         controllers (:controllers app-events)
         height-factor 27
-        width-factor 20
+        width-factor 16
+        stroke-width 2
         controller-connectors (calculate-controllers-connectors events controllers)
         connectors (calculate-main->controllers-connectors events controllers)]
     [:svg {:height (str (* height-factor (count events)) "px")
            :width (str (* width-factor (count controllers)) "px")}
+     [:defs
+      (doall (map (fn [c]
+                    [:marker {:id (str "arrow-" (name c))
+                              :orient "auto"
+                              :marker-width stroke-width
+                              :marker-height (* 2 stroke-width)
+                              :ref-x "4"
+                              :ref-y "2"}
+                     [:path {:d "M0,0 V4 L2,2 Z" :fill (generate-color-from-term (name c))}]])
+                  controllers))]
      [:line {:x1 (/ width-factor 2)
              :x2 (/ width-factor 2)
              :y1 (/ height-factor 2)
              :y2 (+ (/ height-factor 2) (* (count events) height-factor))
              :stroke "black"
-             :stroke-width 2}] 
+             :stroke-width stroke-width}] 
      (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke]}]
                    [:line {:key key
                            :x1 (+ (/ width-factor 2) (* width-factor x1))
                            :x2 (+ (/ width-factor 2) (* width-factor x2))
                            :y1 (+ (/ height-factor 2) (* height-factor y1))
                            :y2 (+ (/ height-factor 2) (* height-factor y2))
-                           :stroke-width 2
+                           :stroke-width stroke-width
                            :stroke stroke}])
                  (flatten (vals controller-connectors))))
-
      (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke]}]
                    [:path
                     {:d (make-connector-path {:x1 (/ width-factor 2)
@@ -139,13 +155,28 @@
                                               :y1 (+ (/ height-factor 2) (* height-factor y1))
                                               :y2 (+ (/ height-factor 2) (* height-factor y2))})
                      :key key
-                     :stroke stroke
-                     :stroke-width 2
+                     :stroke "white"
+                     :stroke-width (* 3 stroke-width)
                      :fill "transparent"}])
+                 (remove nil? (flatten (vals connectors)))))
+
+     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term]}]
+                   [:path
+                    {:d (make-connector-path {:x1 (/ width-factor 2)
+                                              :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                              :y1 (+ (/ height-factor 2) (* height-factor y1))
+                                              :y2 (+ (/ height-factor 2) (* height-factor y2))})
+                     :key key
+                     :stroke stroke
+                     :stroke-width stroke-width
+                     :fill "transparent"
+                     :marker-end (str "url(#arrow-" stroke-color-term ")")}])
                  (remove nil? (flatten (vals connectors)))))
      (doall (map-indexed (fn [idx e]
                            [:circle {:key (:id e)
-                                     :fill (if (= :controller (:type e)) (generate-color-from-term (:topic e)) "black")
+                                     :stroke (if (= :controller (:type e)) (generate-color-from-term (:topic e)) "black")
+                                     :stroke-width stroke-width
+                                     :fill "white"
                                      :r (/ width-factor 4)
                                      :cy (+ (/ height-factor 2) (* idx height-factor))
                                      :cx  (+ (/ width-factor 2) (* width-factor (calculate-x e controllers)))}])
