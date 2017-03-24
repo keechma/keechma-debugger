@@ -119,12 +119,15 @@
         width-factor 16
         stroke-width 2
         controller-connectors (calculate-controllers-connectors events controllers)
-        connectors (calculate-main->controllers-connectors events controllers)]
-    [:svg {:height (str (* height-factor (count events)) "px")
-           :width (str (* width-factor (count controllers)) "px")}
+        connectors (calculate-main->controllers-connectors events controllers)
+        height (str (* height-factor (count events)) "px")
+        width (str (* width-factor (count controllers)) "px")]
+    [:svg {:height height
+           :width width}
      [:defs
       (doall (map (fn [c]
                     [:marker {:id (str "arrow-" (name c))
+                              :key (str "arrow-" (name c))
                               :orient "auto"
                               :marker-width stroke-width
                               :marker-height (* 2 stroke-width)
@@ -132,6 +135,7 @@
                               :ref-y "2"}
                      [:path {:d "M0,0 V4 L2,2 Z" :fill (generate-color-from-term (name c))}]])
                   controllers))]
+     
      [:line {:x1 (/ width-factor 2)
              :x2 (/ width-factor 2)
              :y1 (/ height-factor 2)
