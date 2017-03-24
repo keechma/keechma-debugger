@@ -69,10 +69,9 @@
         arc-1 0
         arc-2 1]
     (str "M" x1 " " y1
-         " V" (+ y1 delta)
-         " A" delta " " delta " 0 0 " arc-1 " " (+ x1 (* delta (signum delta-x))) " " (+ y1 (* 2 delta))
+         " H" (+ x1 delta) 
          " H" (- x2 (* delta (signum delta-x)))
-         " A" delta " " delta " 0 0 " arc-2 " " x2 " " (+ y1 (* 3 delta))
+         " A" delta " " delta " 0 0 " arc-2 " " x2 " " (+ y1 (* 1 delta))
          " V"  y2)
     ))
 
