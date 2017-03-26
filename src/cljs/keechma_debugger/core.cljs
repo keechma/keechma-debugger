@@ -7,6 +7,7 @@
    [keechma-debugger.controllers :refer [controllers]]
    [keechma-debugger.subscriptions :refer [subscriptions]]
    [keechma-debugger.ui-system :as ui-system]
+   [keechma-debugger.stylesheets.core :refer [stylesheet]]
    [keechma.toolbox.css.core :refer [update-page-css]]))
 
 
@@ -30,7 +31,8 @@
 (defonce running-app (clojure.core/atom))
 
 (defn start-app! []
-  (reset! running-app (app-state/start! app-definition)))
+  (reset! running-app (app-state/start! app-definition))
+  (update-page-css (stylesheet)))
 
 (defn dev-setup []
   (when debug?

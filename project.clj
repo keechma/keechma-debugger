@@ -5,6 +5,7 @@
                  [ring/ring-defaults "0.2.3"]
                  [compojure "1.5.2"]
                  [garden "1.3.2"]
+                 [org.clojars.mihaelkonjevic/garden-basscss "0.1.0"]
                  [com.taoensso/sente "1.11.0"]
                  [reagent "0.6.0"]
                  [keechma "0.2.0-SNAPSHOT-10" :exclusions [cljsjs/react-with-addons]]

@@ -4,7 +4,8 @@
   (:require
    [keechma.controller     :as controller]
    [taoensso.sente         :as sente :refer (cb-success?)]
-   [cljs.core.async        :as async :refer (<! >! put! chan close!)]))
+   [cljs.core.async        :as async :refer (<! >! put! chan close!)]
+   [oops.core :refer [ocall]]))
 
 (def event-store-layout
   {:events {}
@@ -22,7 +23,8 @@
    :topic topic
    :name ev-name
    :payload payload
-   :severity severity})
+   :severity severity
+   :created-at (.getTime (js/Date.))})
 
 (defn process-start-event [store event]
   (let [[app-name type direction _ name payload _] event]
@@ -44,9 +46,23 @@
              :apps-status (assoc (:apps-status store) app-name :stop))
       store)))
 
+(defn add-breakpoint-event [prev-events event]
+  (let [[app-name type direction topic ev-name payload severity] event
+        prev-event (last prev-events)
+        prev-created-at (:created-at prev-event)
+        batch-num (inc (count (filter #(= :pause (:type %)) prev-events)))
+        now (.getTime (js/Date.))]
+    (if (and prev-created-at (> (- now prev-created-at) 2000))
+      [(build-event [app-name :pause nil nil [batch-num now] nil :info])
+       (build-event event)]
+      [(build-event event)])))
+
 (defn process-event [store event]
-  (let [[app-name _ _ _ _ _ _] event]
-    (assoc-in store [:events app-name] (conj (get-app-events (:events store) app-name) (build-event event)))))
+  (let [[app-name _ _ _ _ _ _] event
+        prev-events (get-app-events (:events store) app-name)
+        ]
+    (assoc-in store [:events app-name]
+              (concat prev-events (add-breakpoint-event prev-events event)))))
 
 
 (defn store-event [app-db-atom event]
