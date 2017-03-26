@@ -94,6 +94,54 @@
                   acc))))
           acc)) {} indexed-events))))
 
+(defn opening-main->controller-event? [e]
+  (let [type (:type e)
+        topic (:topic e)]
+    (or (and (= :app type)
+             (= :controller topic))
+        (= :component type))))
+
+(defn closing-main->controller-event? [e]
+  (= :controller (:type e)))
+
+(defn main->controller-event? [e]
+  (or (opening-main->controller-event? e)
+      (closing-main->controller-event? e)))
+
+(defn main->controller-line-name [e]
+  (let [topic (:topic e)
+        ev-name (:name e)]
+    (case (:type e)
+      :app [(first ev-name) :lifecycle (last ev-name)]
+      :component ev-name
+      :controller (flatten [topic ev-name]))))
+
+(defn calculate-main->controllers-connectors [events controllers]
+  (let [indexed-events (map-indexed (fn [idx e] [idx e]) events)]
+    (:closed
+     (reduce (fn [acc [idx e]]
+               (if (main->controller-event? e)
+                 (let [connector-key (main->controller-line-name e)
+                       open? (opening-main->controller-event? e)]
+                   (if open?
+                     (let [prev-lines (or (get-in acc [:open connector-key]) [])]
+                       (assoc-in acc [:open connector-key]
+                                 (vec (conj prev-lines
+                                            (build-current-connector-line {} idx controllers e open?)))))
+                     (let [open-lines (get-in acc [:open connector-key])
+                           current-line (first open-lines)
+                           rest-lines (rest open-lines)
+                           closed-lines (or (get-in acc [:closed connector-key]) [])]
+                       (if current-line
+                         (-> acc
+                             (assoc-in [:open connector-key] rest-lines)
+                             (assoc-in [:closed connector-key]
+                                       (vec (conj closed-lines
+                                                  (build-current-connector-line current-line idx controllers e false)))))
+                         acc))))
+                 acc)
+                 ) {} indexed-events))))
+
 (defn signum [val]
   (if (neg? val) -1 1))
 
@@ -130,41 +178,7 @@
          " V"  y2)))
 
 
-(defn opening-main->controller-event? [e]
-  (let [type (:type e)
-        topic (:topic e)]
-    (or (and (= :app type)
-             (= :controller topic))
-        (= :component type))))
 
-(defn closing-main->controller-event? [e]
-  (= :controller (:type e)))
-
-(defn main->controller-event? [e]
-  (or (opening-main->controller-event? e)
-      (closing-main->controller-event? e)))
-
-(defn main->controller-line-name [e]
-  (let [topic (:topic e)
-        ev-name (:name e)]
-    (case (:type e)
-      :app [(first ev-name) :lifecycle (last ev-name)]
-      :component ev-name
-      :controller (flatten [topic ev-name]))))
-
-(defn calculate-main->controllers-connectors [events controllers]
-  (reduce (fn [acc [idx e]]
-            (let [type (:type e)]
-              (if (main->controller-event? e)
-                (let [connector-name (main->controller-line-name e)
-                      open? (opening-main->controller-event? e)
-                      close? (closing-main->controller-event? e)
-                      lines (get acc connector-name)
-                      prev-lines (if open? lines (drop-last lines))
-                      current-line (if open? {} (or (last lines) {}))]
-                  (assoc acc connector-name (conj (vec prev-lines) (build-current-connector-line current-line idx controllers e open?))))
-                acc)
-              )) {} (map-indexed (fn [idx e] [idx e]) events)))
 
 (defn render [app-events {:keys [height-factor width-factor stroke-width width height]}]
   (let [events (:events app-events)
