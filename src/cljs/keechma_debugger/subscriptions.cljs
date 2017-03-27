@@ -13,4 +13,7 @@
                             :controllers (get controllers app-name)} ))) [] apps-order))))
 
 (def subscriptions
-  {:collector-value collector-value})
+  {:collector-value collector-value
+   :row-dimensions (fn [app-db-atom]
+                     (reaction
+                      (get-in @app-db-atom [:kv :row-dimensions])))})

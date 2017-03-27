@@ -4,7 +4,8 @@
    [keechma.toolbox.css.core :refer-macros [defelement]]
    [keechma-debugger.util :refer [index-of]]
    [garden.color :as color]
-   [goog.string :as gstring]))
+   [goog.string :as gstring]
+   [keechma.toolbox.ui :refer [<cmd sub>]]))
 
 (defn generate-color-from-term [t]
   (let [term (name t)
@@ -23,18 +24,20 @@
 
 (defn build-current-controller-line [current-line idx x e]
   (if (:y1 current-line)
-    (assoc current-line :y2 idx)
-    {:key (:id e) :stroke-width 2 :stroke (generate-color-from-term (:topic e)) :x1 x :x2 x :y1 idx}))
+    (assoc current-line :y2 idx :ev2-id (:id e))
+    {:key (:id e) :stroke-width 2 :stroke (generate-color-from-term (:topic e)) :x1 x :x2 x :y1 idx :ev1-id (:id e)}))
 
 (defn build-current-connector-line [line idx controllers e open?]
   (if open?
     {:x1 0
      :y1 idx
+     :ev1-id (:id e)
      :key (:id e)}
     (if (and (:x1 line) (:y1 line) (nil? (:x2 line)) (nil? (:y2 line)))
       (assoc line
              :x2 (calculate-x e controllers)
              :y2 idx
+             :ev2-id (:id e)
              :stroke-color-term (name (:topic e))
              :stroke (generate-color-from-term (:topic e)))
       nil)))
@@ -43,6 +46,7 @@
   (if open?
     {:x1 (calculate-x e controllers)
      :y1 idx
+     :ev1-id (:id e)
      :stroke-color-term (name (:topic e))
      :stroke (generate-color-from-term (:topic e))
      :key (:id e)}
@@ -50,6 +54,7 @@
       (when (not= (:x1 line) x2)
         (assoc line
                :x2 x2
+               :ev2-id (:id e)
                :y2 idx)))))
 
 (defn calculate-controllers-connectors [events controllers]
@@ -149,23 +154,7 @@
   (let [delta-factor 0.25
         delta-x (* delta-factor (- x2 x1))
         delta-y (* delta-factor (- y2 y1))
-        delta 10
-
-        x-diff (- x2 x1)
-        y-diff (- y2 y1)
-
-        arc-1 0
-        arc-2 1]
-    (str "M" x1 " " y1
-         " H" (- x2 (* delta (signum delta-x)))
-         " A" delta " " delta " 0 0 " arc-2 " " x2 " " (+ y1 (* 1 delta))
-         " V"  y2)))
-
-(defn make-send-command-connector-path [{:keys [x1 x2 y1 y2]}]
-  (let [delta-factor 0.25
-        delta-x (* delta-factor (- x2 x1))
-        delta-y (* delta-factor (- y2 y1))
-        delta 10
+        delta 5
 
         x-diff (- x2 x1)
         y-diff (- y2 y1)
@@ -177,15 +166,16 @@
          " A" delta " " delta " 0 0 " (if (> x1 x2) arc-1 arc-2) " " x2 " " (+ y1 (* 1 delta))
          " V"  y2)))
 
-
-
-
-(defn render [app-events {:keys [height-factor width-factor stroke-width width height]}]
+(defn render [ctx app-events {:keys [height-factor width-factor stroke-width width]}]
   (let [events (:events app-events)
         controllers (:controllers app-events)
         controller-connectors (calculate-controllers-connectors events controllers)
         connectors (calculate-main->controllers-connectors events controllers)
-        send-command-connectors (calculate-send-command-connectors events controllers)]
+        send-command-connectors (calculate-send-command-connectors events controllers)
+        row-dimensions (sub> ctx :row-dimensions)
+        get-top (fn [ev-id]
+                  (+ 25 (or (get-in row-dimensions [ev-id :y1]) 0)))
+        height (or (apply max (map :y2 (vals row-dimensions))) 0)]
     [:svg {:height (str height "px")
            :width (str width "px")}
      [:defs
@@ -202,75 +192,77 @@
      
      [:line {:x1 (/ width-factor 2)
              :x2 (/ width-factor 2)
-             :y1 (/ height-factor 2)
-             :y2 (+ (/ height-factor 2) (* (count events) height-factor))
+             :y1 0
+             :y2 height
              :stroke "black"
              :stroke-width stroke-width}] 
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke]}]
-                   [:line {:key key
-                           :x1 (+ (/ width-factor 2) (* width-factor x1))
-                           :x2 (+ (/ width-factor 2) (* width-factor x2))
-                           :y1 (+ (/ height-factor 2) (* height-factor y1))
-                           :y2 (+ (/ height-factor 2) (* height-factor y2))
-                           :stroke-width stroke-width
-                           :stroke stroke}])
-                 (flatten (vals controller-connectors))))
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke]}]
-                   [:path
-                    {:d (make-connector-path {:x1 (/ width-factor 2)
-                                              :x2 (+ (/ width-factor 2) (* width-factor x2))
-                                              :y1 (+ (/ height-factor 2) (* height-factor y1))
-                                              :y2 (+ (/ height-factor 2) (* height-factor y2))})
-                     :key key
-                     :stroke "white"
-                     :stroke-width (* 3 stroke-width)
-                     :fill "transparent"}])
-                 (remove nil? (flatten (vals connectors)))))
+     [:g (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke ev1-id ev2-id]}]
+                       [:line {:key key
+                               :x1 (+ (/ width-factor 2) (* width-factor x1))
+                               :x2 (+ (/ width-factor 2) (* width-factor x2))
+                               :y1 (get-top ev1-id)
+                               :y2 (get-top ev2-id)
+                               :stroke-width stroke-width
+                               :stroke stroke}])
+                     (flatten (vals controller-connectors))))]
+     [:g (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke ev1-id ev2-id]}]
+                       [:path
+                        {:d (make-connector-path {:x1 (/ width-factor 2)
+                                                  :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                                  :y1 (get-top ev1-id)
+                                                  :y2 (get-top ev2-id)})
+                         :key key
+                         :stroke "white"
+                         :stroke-width (* 3 stroke-width)
+                         :fill "transparent"}])
+                     (remove nil? (flatten (vals connectors)))))]
 
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term]}]
-                   [:path
-                    {:d (make-connector-path {:x1 (/ width-factor 2)
-                                              :x2 (+ (/ width-factor 2) (* width-factor x2))
-                                              :y1 (+ (/ height-factor 2) (* height-factor y1))
-                                              :y2 (+ (/ height-factor 2) (* height-factor y2))})
-                     :key key
-                     :stroke stroke
-                     :stroke-width stroke-width
-                     :fill "transparent"
-                     :marker-end (str "url(#arrow-" stroke-color-term ")")}])
-                 (remove nil? (flatten (vals connectors)))))
+     [:g (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term ev1-id ev2-id]}]
+                       [:path
+                        {:d (make-connector-path {:x1 (/ width-factor 2)
+                                                  :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                                  :y1 (get-top ev1-id)
+                                                  :y2 (get-top ev2-id)})
+                         :key key
+                         :stroke stroke
+                         :stroke-width stroke-width
+                         :fill "transparent"
+                         :marker-end (str "url(#arrow-" stroke-color-term ")")}])
+                     (remove nil? (flatten (vals connectors)))))]
 
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term]}]
-                   [:path
-                    {:d (make-send-command-connector-path {:x1 (+ (/ width-factor 2) (* width-factor x1))
-                                                           :x2 (+ (/ width-factor 2) (* width-factor x2))
-                                                           :y1 (+ (/ height-factor 2) (* height-factor y1))
-                                                           :y2 (+ (/ height-factor 2) (* height-factor y2))})
-                     :key key
-                     :stroke "white"
-                     :stroke-width (* 3 stroke-width)
-                     :fill "transparent"}])
-                 (remove nil? (reverse (flatten (vals send-command-connectors))))))
+     [:g (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term ev1-id ev2-id]}]
+                       [:path
+                        {:d (make-connector-path {:x1 (+ (/ width-factor 2) (* width-factor x1))
+                                                  :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                                  :y1 (get-top ev1-id)
+                                                  :y2 (get-top ev2-id)})
+                         :key key
+                         :stroke "white"
+                         :stroke-width (* 3 stroke-width)
+                         :fill "transparent"}])
+                     (remove nil? (reverse (flatten (vals send-command-connectors))))))]
 
-     (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term]}]
-                   [:path
-                    {:d (make-send-command-connector-path {:x1 (+ (/ width-factor 2) (* width-factor x1))
-                                                           :x2 (+ (/ width-factor 2) (* width-factor x2))
-                                                           :y1 (+ (/ height-factor 2) (* height-factor y1))
-                                                           :y2 (+ (/ height-factor 2) (* height-factor y2))})
-                     :key key
-                     :stroke stroke
-                     :stroke-width stroke-width
-                     :fill "transparent"
-                     :marker-end (str "url(#arrow-" stroke-color-term ")")}])
-                 (remove nil? (reverse (flatten (vals send-command-connectors))))))
-     (doall (map-indexed (fn [idx e]
-                           (when (not= :pause (:type e))
-                             [:circle {:key (:id e)
-                                       :stroke (if (= :controller (:type e)) (generate-color-from-term (:topic e)) "black")
-                                       :stroke-width stroke-width
-                                       :fill "white"
-                                       :r (/ width-factor 4)
-                                       :cy (+ (/ height-factor 2) (* idx height-factor))
-                                       :cx  (+ (/ width-factor 2) (* width-factor (calculate-x e controllers)))}]))
-                         events))]))
+     [:g (doall (map (fn [{:keys [x1 x2 y1 y2 key stroke stroke-color-term ev1-id ev2-id]}]
+                       [:path
+                        {:d (make-connector-path {:x1 (+ (/ width-factor 2) (* width-factor x1))
+                                                  :x2 (+ (/ width-factor 2) (* width-factor x2))
+                                                  :y1 (get-top ev1-id)
+                                                  :y2 (get-top ev2-id)
+                                                  })
+                         :key key
+                         :stroke stroke
+                         :stroke-width stroke-width
+                         :fill "transparent"
+                         :marker-end (str "url(#arrow-" stroke-color-term ")")}])
+                     (remove nil? (reverse (flatten (vals send-command-connectors))))))]
+
+     [:g (doall (map-indexed (fn [idx e]
+                               (when (not= :pause (:type e))
+                                 [:circle {:key (:id e)
+                                           :stroke (if (= :controller (:type e)) (generate-color-from-term (:topic e)) "black")
+                                           :stroke-width stroke-width
+                                           :fill "white"
+                                           :r (/ width-factor 4)
+                                           :cy (get-top (:id e))
+                                           :cx (+ (/ width-factor 2) (* width-factor (calculate-x e controllers)))}]))
+                             events))]]))
