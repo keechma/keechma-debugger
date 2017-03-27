@@ -168,14 +168,15 @@
 
 (defn render [ctx app-events {:keys [height-factor width-factor stroke-width width]}]
   (let [events (:events app-events)
+        app-name (:name app-events)
         controllers (:controllers app-events)
         controller-connectors (calculate-controllers-connectors events controllers)
         connectors (calculate-main->controllers-connectors events controllers)
         send-command-connectors (calculate-send-command-connectors events controllers)
         row-dimensions (sub> ctx :row-dimensions)
         get-top (fn [ev-id]
-                  (+ 25 (or (get-in row-dimensions [ev-id :y1]) 0)))
-        height (or (apply max (map :y2 (vals row-dimensions))) 0)]
+                  (+ 25 (or (get-in row-dimensions [app-name ev-id :y1]) 0)))
+        height (or (apply max (map :y2 (vals (get row-dimensions app-name)))) 0)]
     [:svg {:height (str height "px")
            :width (str width "px")}
      [:defs

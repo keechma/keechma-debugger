@@ -10,14 +10,11 @@
    [keechma.toolbox.util :refer [class-names]]))
 
 (defelement -event-wrap
-  :class [:monospaced :h5 :bd-clouds :bg-h-clouds :py2]
-  :style [{;;:height "40px"
-           ;;:line-height "40px"
-           :border-bottom-width "1px"
+  :class [:monospaced :h5 :bd-clouds :py2]
+  :style [{:border-bottom-width "1px"
            :border-bottom-style "solid"}
-          [:&.route-changed {:border-top "2px solid black"
-                             ;;:line-height "39px"
-                             }]
+          [:&:hover {:background "#fbfbfb"}]
+          [:&.route-changed {:border-top "2px solid black"}]
           [:&.pause {:background "linear-gradient(to right top, transparent 33%, #bdc3c7 33%, #bdc3c7 66%, transparent 66%)"
                      :background-size "3px 3px"}]])
 
@@ -32,19 +29,23 @@
 
 (defelement -event-batch-label
   :tag :span
-  :class [:bg-white :c-asbestos :rounded :inline-block :relative]
+  :class [:bg-white :c-asbestos :rounded :inline-block]
   :style {:line-height "17px"
           :font-weight "bold"
           :font-size "11px"
-          :padding "0 5px"
-          :top "11px"})
+          :padding "0 5px"})
+
+(defelement -expand-event-btn
+  :tag :button
+  :class [:right :mr2])
 
 (defn render-component-ev [e]
   (let [topic (:topic e)]
     (let [controller-name (first (:name e))
           controller-action (last (:name e))]
       [:span 
-       [:b "component/" (str topic)]
+       "component/"
+       [:b (str topic)]
        [:i.fa.fa-chevron-circle-right.mx1]
        [:span {:style {:color (graph/generate-color-from-term controller-name)}}
         "controller/"
@@ -110,7 +111,7 @@
     [:i.fa.fa-chevron-circle-right.mx1]
     ":app/" (:name e)]])
 
-(defn inner-render [ctx props e]
+(defn inner-render [ctx props app-name e expanded?]
   (let [type (:type e)
         graph-config (:graph-config props)]
     [-event-wrap 
@@ -126,23 +127,31 @@
        :router (render-router-ev e)
        :pause (render-pause-ev e)
        (str (:type e) (:direction e) (:topic e) (:name e)))
-     [:div
-      [jr/render (:payload e)]]]))
 
-(defn measure-row [ctx e this]
+     (when (not= "nil" (:payload e))
+       [-expand-event-btn {:on-click #(<cmd ctx :toggle-expanded [app-name (:id e)])} "Toggle Payload"])
+     (when expanded?
+       [:pre.h3.mt2.mr2.mb0 (:payload e)])]))
+
+(defn measure-row [ctx app-name e this]
   (let [dom-node (r/dom-node this)
         client-rect (.getBoundingClientRect dom-node)
-        offset-top (.-offsetTop dom-node)]
-    (<cmd ctx :row-dimensions {:id (:id e)
-                               :dimensions {:y1 offset-top :y2 (+ offset-top (.-height client-rect))}})))
+        offset-top (.-offsetTop dom-node)
+        current-dimensions {:y1 offset-top :y2 (+ offset-top (.-height client-rect))}
+        prev-dimensions (get-in (sub> ctx :row-dimensions) [app-name (:id e)])]
+    (when (not= current-dimensions prev-dimensions)
+      (<cmd ctx :row-dimensions {:id (:id e)
+                                 :app-name app-name
+                                 :dimensions current-dimensions}))))
 
-(defn render [ctx props e]
+(defn render [ctx props app-name e]
   (r/create-class
-   {:reagent-render (fn [props e] [inner-render ctx props e])
-    :component-did-mount #(measure-row ctx e %)
-    :component-did-update #(measure-row ctx e %)}))
+   {:reagent-render (fn [props app-name e] [inner-render ctx props app-name e (sub> ctx :event-expanded? (:id e))])
+    :component-did-mount #(measure-row ctx app-name e %)
+    :component-did-update #(measure-row ctx app-name e %)}))
 
 (def component
   (ui/constructor
    {:renderer render
-    :topic :event}))
+    :topic :event
+    :subscription-deps [:event-expanded? :row-dimensions]}))

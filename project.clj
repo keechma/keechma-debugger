@@ -10,7 +10,8 @@
                  [reagent "0.6.0"]
                  [keechma "0.2.0-SNAPSHOT-10" :exclusions [cljsjs/react-with-addons]]
                  [binaryage/oops "0.5.2"]
-                 [funcool/promesa "1.6.0"]]
+                 [funcool/promesa "1.6.0"]
+                 [fipp "0.6.8"]]
 
   :min-lein-version "2.5.3"
 

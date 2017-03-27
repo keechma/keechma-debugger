@@ -62,7 +62,9 @@
      [-graph-wrap {:style {:width (str (:width graph-config) "px")}}
       [graph/render ctx app-events graph-config]]
      [-events-wrap
-      (doall (map (fn [e] [(ui/component ctx :event) {:key (:id e) :graph-config graph-config} e]) events))]]))
+      (doall
+       (map (fn [e] [(ui/component ctx :event) {:key (:id e) :graph-config graph-config} (:name app-events) e])
+            events))]]))
 
 (defn render-list [ctx app-events]
   (let [ev-count (atom 0)]

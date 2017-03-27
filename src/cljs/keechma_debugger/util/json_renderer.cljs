@@ -1,7 +1,8 @@
 (ns keechma-debugger.util.json-renderer
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [keechma.toolbox.css.core :refer-macros [defelement]]))
 
-;;; Created with https://github.com/yogthos/json-html
+;; Ported from https://github.com/yogthos/json-html
 
 (defn escape-html [s]
   (str/escape s
@@ -11,7 +12,7 @@
            "\"" "&quot;"}))
 
 (defn render-keyword [k]
-  (->> k ((juxt namespace name)) (remove nil?) (str/join "/")))
+  (str ":" (->> k ((juxt namespace name)) (remove nil?) (str/join "/"))))
 
 (defn str-compare [k1 k2]
   (compare (str k1) (str k2)))
@@ -56,9 +57,9 @@
                   [:td.jh-value.jh-object-value (render v)]])]]))
 
 (defn render-string [s]
-  [:span.jh-type-string
-   (if (str/blank? s)
-     [:span.jh-empty-string {:dangerouslyInsertHTML {:__html (escape-html s)}}])])
+  (if (str/blank? s)
+    [:span.jh-type-string [:span.jh-empty-string]]
+    [:span.jh-type-string {:dangerouslyInsertHTML {:__html (escape-html s)}}]))
 
 (defn render [v]
     (let [t (type v)]

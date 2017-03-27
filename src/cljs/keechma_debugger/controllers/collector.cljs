@@ -4,6 +4,8 @@
   (:require
    [keechma.controller     :as controller]
    [taoensso.sente         :as sente :refer (cb-success?)]
+   [fipp.edn :as fipp-edn]
+   [clojure.string :as str]
    [cljs.core.async        :as async :refer (<! >! put! chan close!)]
    [oops.core :refer [ocall]]))
 
@@ -22,7 +24,7 @@
    :direction direction
    :topic topic
    :name ev-name
-   :payload payload
+   :payload (str/trim (with-out-str (fipp-edn/pprint payload)))
    :severity severity
    :created-at (.getTime (js/Date.))})
 
@@ -46,7 +48,7 @@
              :apps-status (assoc (:apps-status store) app-name :stop))
       store)))
 
-(defn add-breakpoint-event [prev-events event]
+(defn add-pause-event [prev-events event]
   (let [[app-name type direction topic ev-name payload severity] event
         prev-event (last prev-events)
         prev-created-at (:created-at prev-event)
@@ -62,7 +64,7 @@
         prev-events (get-app-events (:events store) app-name)
         ]
     (assoc-in store [:events app-name]
-              (concat prev-events (add-breakpoint-event prev-events event)))))
+              (concat prev-events (add-pause-event prev-events event)))))
 
 
 (defn store-event [app-db-atom event]
